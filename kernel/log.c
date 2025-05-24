@@ -233,4 +233,27 @@ log_write(struct buf *b)
   }
   release(&log.lock);
 }
+#include "types.h"
+#include "defs.h"
+#include "param.h"
+#include "memlayout.h"
+#include "mmu.h"
+#include "proc.h"
+#include "fs.h"
+#include "file.h"
+#include "log.h"
+
+void log_access(int pid, const char *proc_name, const char *filename, const char *op_type) {
+    acquire(&tickslock);  // to safely access ticks
+    if (log_index < MAX_LOGS) {
+        logs[log_index].pid = pid;
+        safestrcpy(logs[log_index].proc_name, proc_name, MAX_NAME_LEN);
+        safestrcpy(logs[log_index].filename, filename, MAX_FILENAME_LEN);
+        safestrcpy(logs[log_index].op_type, op_type, sizeof(logs[log_index].op_type));
+        logs[log_index].ticks = ticks;
+        log_index++;
+    }
+    release(&tickslock);
+}
+
 

@@ -693,3 +693,21 @@ procdump(void)
     printf("\n");
   }
 }
+struct access_log logs[MAX_LOGS];
+int log_index = 0;
+int sys_get_logs(void) {
+    struct access_log *user_logs;
+    int max_logs;
+
+    if (argptr(0, (void*)&user_logs, sizeof(struct access_log *)) < 0)
+        return -1;
+    if (argint(1, &max_logs) < 0)
+        return -1;
+
+    int n = log_index < max_logs ? log_index : max_logs;
+    if (copyout(myproc()->pagetable, (uint64)user_logs, (char*)logs, n * sizeof(struct access_log)) < 0)
+        return -1;
+    return n;
+}
+
+

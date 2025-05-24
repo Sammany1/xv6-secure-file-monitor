@@ -76,6 +76,11 @@ sys_read(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  int bytes = fileread(f, p, n);
+
+  if (bytes >= 0 && f->ip) {
+    log_access(proc->pid, proc->name, f->ip->name, "read");
+  }
   return fileread(f, p, n);
 }
 
@@ -90,6 +95,11 @@ sys_write(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  int bytes = filewrite(f, p, n);
+
+  if (bytes >= 0 && f->ip) {
+    log_access(proc->pid, proc->name, f->ip->name, "write");
+  }
 
   return filewrite(f, p, n);
 }
@@ -102,6 +112,9 @@ sys_close(void)
 
   if(argfd(0, &fd, &f) < 0)
     return -1;
+  if (f && f->ip) {
+    log_access(proc->pid, proc->name, f->ip->name, "close");
+  }
   myproc()->ofile[fd] = 0;
   fileclose(f);
   return 0;
@@ -366,6 +379,9 @@ sys_open(void)
 
   iunlock(ip);
   end_op();
+  if (fd >= 0 && f) {
+        log_access(proc->pid, proc->name, path, "open");
+    }
 
   return fd;
 }
