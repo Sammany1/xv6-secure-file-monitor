@@ -101,6 +101,9 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+// failed logs
+extern uint64 sys_get_failed_logs(void);
+extern uint64 sys_get_process_failures(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -126,6 +129,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+// failed logs
+[SYS_get_failed_logs] sys_get_failed_logs,
+[SYS_get_process_failures] sys_get_process_failures,
 };
 
 void
@@ -145,3 +151,5 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
+
+

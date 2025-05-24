@@ -25,6 +25,7 @@ OBJS = \
   $K/log.o \
   $K/sleeplock.o \
   $K/file.o \
+  $K/faillog.o \
   $K/pipe.o \
   $K/exec.o \
   $K/sysfile.o \
@@ -194,9 +195,8 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-
-
-
+	$U/_showfails\
+	$U/_testfails\
 
 ifeq ($(LAB),syscall)
 UPROGS += \

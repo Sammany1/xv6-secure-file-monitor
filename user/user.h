@@ -1,4 +1,13 @@
 struct stat;
+struct failed_access_log {
+    int pid;
+    char proc_name[16];
+    char filename[32];
+    int failure_type;
+    uint timestamp;
+    int valid;
+};
+
 
 // system calls
 int fork(void);
@@ -22,6 +31,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int get_failed_logs(struct failed_access_log *logs, int max_entries);
+int get_process_failures(int pid);
 
 // ulib.c
 int stat(const char*, struct stat*);

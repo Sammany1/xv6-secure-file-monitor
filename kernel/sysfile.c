@@ -309,6 +309,7 @@ sys_open(void)
   struct file *f;
   struct inode *ip;
   int n;
+  struct proc *p = myproc();
 
   argint(1, &omode);
   if((n = argstr(0, path, MAXPATH)) < 0)
@@ -320,17 +321,23 @@ sys_open(void)
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
+      // log failed attempt
+      log_failed_access(p->pid, p->name, path, 1);
       return -1;
     }
   } else {
     if((ip = namei(path)) == 0){
       end_op();
+      // log file not found
+      log_failed_access(p->pid, p->name, path, 2);
       return -1;
     }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
+      // log permission denied for directory
+      log_failed_access(p->pid, p->name, path, 1);
       return -1;
     }
   }
@@ -338,6 +345,9 @@ sys_open(void)
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
+    // log invalid device access
+    struct proc *p = myproc();
+    log_failed_access(p->pid, p->name, path, 3); // FAIL_ACCESS
     return -1;
   }
 
@@ -346,6 +356,9 @@ sys_open(void)
       fileclose(f);
     iunlockput(ip);
     end_op();
+    // log resource allocation failure
+    struct proc *p = myproc();
+    log_failed_access(p->pid, p->name, path, 3); // FAIL_ACCESS
     return -1;
   }
 
@@ -368,6 +381,18 @@ sys_open(void)
   end_op();
 
   return fd;
+}
+
+// Add a helper function to check file permissions
+int
+check_file_permission(struct inode *ip, int requested_access)
+{
+    // Simple permission check - in real systems this would be more complex
+    // For xv6, we can simulate permission failures
+    
+    // Simulate: files starting with "secret" require special permission
+    // This is just for demonstration - you can make it more sophisticated
+    return 1; // Always allow for now, but log attempts
 }
 
 uint64
@@ -416,12 +441,16 @@ sys_chdir(void)
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == 0){
     end_op();
+    // Log file/directory not found
+    log_failed_access(p->pid, p->name, path, 2); // FAIL_NOT_FOUND
     return -1;
   }
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
     end_op();
+    // Log trying to chdir to a file (not a directory)
+    log_failed_access(p->pid, p->name, path, 3); // FAIL_ACCESS
     return -1;
   }
   iunlock(ip);

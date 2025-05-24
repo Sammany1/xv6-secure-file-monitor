@@ -25,6 +25,12 @@ void            consputc(int);
 // exec.c
 int             exec(char*, char**);
 
+// faillog.c
+void            faillog_init(void);
+void            log_failed_access(int pid, char *proc_name, char *filename, int failure_type);
+int             get_failed_logs(uint64 user_buf, int max_entries);
+int             get_process_failures(int target_pid);
+
 // file.c
 struct file*    filealloc(void);
 void            fileclose(struct file*);
