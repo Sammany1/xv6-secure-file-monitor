@@ -187,3 +187,18 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+#define MAX_LOGS 128
+#define MAX_NAME_LEN 16
+#define MAX_FILENAME_LEN 128
+
+struct access_log {
+    int pid;
+    char proc_name[MAX_NAME_LEN];
+    char filename[MAX_FILENAME_LEN];
+    char op_type[8];  // "open", "read", etc.
+    uint ticks;       // timestamp (use ticks from the kernel timer)
+};
+
+extern struct access_log logs[MAX_LOGS];
+extern int log_index;
+
