@@ -81,8 +81,8 @@ sys_read(void)
 
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    char filename[64];
-    if(f->type == FD_INODE && f->ip) {
+    char filename[16];
+    if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
       safestrcpy(filename, "file", sizeof(filename));
     } else {
       safestrcpy(filename, "device", sizeof(filename));
@@ -109,8 +109,8 @@ sys_write(void)
   
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    char filename[64];
-    if(f->type == FD_INODE && f->ip) {
+    char filename[16];
+    if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
       safestrcpy(filename, "file", sizeof(filename));
     } else {
       safestrcpy(filename, "stdout", sizeof(filename));
@@ -131,8 +131,8 @@ sys_close(void)
     return -1;
   
   // Simple logging call - let filelog.c handle the filtering
-  char filename[64];
-  if(f->type == FD_INODE && f->ip) {
+  char filename[16];
+  if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
     safestrcpy(filename, "file", sizeof(filename));
   } else {
     safestrcpy(filename, "device", sizeof(filename));
