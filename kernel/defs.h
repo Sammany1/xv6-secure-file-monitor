@@ -34,6 +34,14 @@ int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
 int             filewrite(struct file*, uint64, int n);
 
+// filelog.c
+void            filelog_init(void);
+void            log_file_access(int pid, char *proc_name, char *filename, char *operation, int bytes, int success);
+void            log_file_access_force(int pid, char *proc_name, char *filename, char *operation, int bytes, int success);
+int             get_file_logs(uint64 user_buf, int max_entries);
+int             get_file_stats(char *filename, uint64 user_stats);
+void            clear_file_logs(void);
+
 // fs.c
 void            fsinit(int);
 int             dirlink(struct inode*, char*, uint);
