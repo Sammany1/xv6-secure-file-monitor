@@ -105,7 +105,7 @@ sys_write(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
-    if(!f->writable){
+  if(!f->writable){
     log_file_access(proc->pid, proc->name, "WRITE", f->path, -1, 0);
     return -1 ;
   }
@@ -480,17 +480,20 @@ sys_chdir(void)
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == 0){
     end_op();
+    log_file_access(p->pid, p->name, "CHDIR", path, -1, 0);
     return -1;
   }
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
     end_op();
+    log_file_access(p->pid, p->name, "CHDIR", path, -1, 0);
     return -1;
   }
   iunlock(ip);
   iput(p->cwd);
   end_op();
+  log_file_access(p->pid, p->name, "CHDIR", path, 0, 1);
   p->cwd = ip;
   return 0;
 }
