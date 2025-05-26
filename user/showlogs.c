@@ -4,7 +4,17 @@
 
 void pad(const char *s, int width) {
     int len = strlen(s);
-    printf("%s", s);
+    if(len > width) {
+        char tmp[width+1];
+        for(int i=0; i<width; i++) {
+            tmp[i] = s[i];
+        }
+        tmp[width] = '\0';
+        printf("%s", tmp);
+    }
+    else{
+        printf("%s", s);
+    }
     for(int i = len; i < width; i++)
         printf(" ");
 }
@@ -80,13 +90,13 @@ main(int argc, char *argv[])
     
     printf("Recent File Access Log (%d entries):\n", count);
     printf("PID    Process    Operation    File             Bytes    Status    Time\n");
-    printf("---    -------    ---------    -------------    -----    ------    ----\n");
+    printf("---    -------    ---------    --------------   -----    ------    ----\n");
     
     for(int i = 0; i < count; i++) {
         pad_num(logs[i].pid, 3);        printf("    ");
         pad(logs[i].proc_name, 7);     printf("    ");
         pad(logs[i].operation, 9);      printf("    ");
-        pad(logs[i].filename, 13);      printf("    ");
+        pad(logs[i].filename, 14);      printf("    ");
         pad_num(logs[i].bytes_transferred, 5); printf("    ");
         pad(logs[i].status ? "OK" : "FAIL", 6); printf("    ");
         pad_num(logs[i].timestamp, 4); printf("\n");
