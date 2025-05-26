@@ -77,11 +77,18 @@ sys_read(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  if(!f->readable){
+    log_file_access(proc->pid, proc->name, "READ", f->path, -1, 0);
+    return -1 ;
+  }
   int result = fileread(f, p, n);
 
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
     log_file_access(proc->pid, proc->name, "READ", f->path, result, 1);
+  }
+  else {
+    log_file_access(proc->pid, proc->name, "READ", f->path, result, 0);
   }
   return result;
 }
@@ -98,12 +105,19 @@ sys_write(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+    if(!f->writable){
+    log_file_access(proc->pid, proc->name, "WRITE", f->path, -1, 0);
+    return -1 ;
+  }
 
   int result = filewrite(f, p, n);
   
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
     log_file_access(proc->pid, proc->name, "WRITE", f->path, result, 1);
+  }
+  else {
+    log_file_access(proc->pid, proc->name, "WRITE", f->path, result, 0);
   }
   return result;
 }
@@ -115,8 +129,10 @@ sys_close(void)
   struct file *f;
   struct proc *proc = myproc();
 
-  if(argfd(0, &fd, &f) < 0)
+  if(argfd(0, &fd, &f) < 0){
+  log_file_access(proc->pid, proc->name, "CLOSE", "", -1, 0);
     return -1;
+  }
   
   // Simple logging call
   log_file_access(proc->pid, proc->name, "CLOSE", f->path, 0, 1);
@@ -213,29 +229,39 @@ sys_unlink(void)
   uint off;
   struct proc *proc = myproc();
 
-  if(argstr(0, path, MAXPATH) < 0)
+  if(argstr(0, path, MAXPATH) < 0){
+    log_file_access(proc->pid, proc->name, "DELETE", path, -1, 0);
     return -1;
+  }
 
   begin_op();
   if((dp = nameiparent(path, name)) == 0){
     end_op();
+    log_file_access(proc->pid, proc->name, "DELETE", path, -1, 0);
     return -1;
   }
 
   ilock(dp);
 
   // Cannot unlink "." or "..".
-  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0){
     goto bad;
+    return -1 ;
+  }
 
-  if((ip = dirlookup(dp, name, &off)) == 0)
+  if((ip = dirlookup(dp, name, &off)) == 0){
     goto bad;
+    return -1 ;
+  }
   ilock(ip);
 
   if(ip->nlink < 1)
     panic("unlink: nlink < 1");
   if(ip->type == T_DIR && !isdirempty(ip)){
     iunlockput(ip);
+    iunlockput(dp);
+    end_op();
+    log_file_access(proc->pid, proc->name, "DELETE", path, -1, 0);
     goto bad;
   }
 
@@ -344,6 +370,7 @@ sys_open(void)
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
       return -1;
     }
     // Always log creation
@@ -351,12 +378,14 @@ sys_open(void)
   } else {
     if((ip = namei(path)) == 0){
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
       return -1;
     }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
       return -1;
     }
   }
@@ -364,6 +393,7 @@ sys_open(void)
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
+    log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
     return -1;
   }
 
@@ -372,6 +402,7 @@ sys_open(void)
       fileclose(f);
     iunlockput(ip);
     end_op();
+    log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
     return -1;
   }
 
