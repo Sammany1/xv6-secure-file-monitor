@@ -91,3 +91,34 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_get_file_logs(void)
+{
+  uint64 user_buf;
+  int max_entries;
+  
+  argaddr(0, &user_buf);
+  argint(1, &max_entries);
+  
+  return get_file_logs(user_buf, max_entries);
+}
+
+uint64
+sys_get_file_stats(void)
+{
+  char filename[64];
+  uint64 user_stats;
+  
+  argstr(0, filename, sizeof(filename));
+  argaddr(1, &user_stats);
+  
+  return get_file_stats(filename, user_stats);
+}
+
+uint64
+sys_clear_logs(void)
+{
+  clear_file_logs();
+  return 0;
+}

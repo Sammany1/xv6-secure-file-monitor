@@ -71,12 +71,19 @@ sys_read(void)
   struct file *f;
   int n;
   uint64 p;
+  struct proc *proc = myproc();
 
   argaddr(1, &p);
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
-  return fileread(f, p, n);
+  int result = fileread(f, p, n);
+
+  // Simple logging call - let filelog.c handle the filtering
+  if(result >= 0) {
+    log_file_access(proc->pid, proc->name, "READ", f->path, result, 1);
+  }
+  return result;
 }
 
 uint64
@@ -85,13 +92,20 @@ sys_write(void)
   struct file *f;
   int n;
   uint64 p;
+  struct proc *proc = myproc();
   
   argaddr(1, &p);
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
 
-  return filewrite(f, p, n);
+  int result = filewrite(f, p, n);
+  
+  // Simple logging call - let filelog.c handle the filtering
+  if(result >= 0) {
+    log_file_access(proc->pid, proc->name, "WRITE", f->path, result, 1);
+  }
+  return result;
 }
 
 uint64
@@ -99,9 +113,14 @@ sys_close(void)
 {
   int fd;
   struct file *f;
+  struct proc *proc = myproc();
 
   if(argfd(0, &fd, &f) < 0)
     return -1;
+  
+  // Simple logging call
+  log_file_access(proc->pid, proc->name, "CLOSE", f->path, 0, 1);
+
   myproc()->ofile[fd] = 0;
   fileclose(f);
   return 0;
@@ -192,6 +211,7 @@ sys_unlink(void)
   struct dirent de;
   char name[DIRSIZ], path[MAXPATH];
   uint off;
+  struct proc *proc = myproc();
 
   if(argstr(0, path, MAXPATH) < 0)
     return -1;
@@ -233,6 +253,9 @@ sys_unlink(void)
   iunlockput(ip);
 
   end_op();
+
+  // Simple logging call
+  log_file_access(proc->pid, proc->name, "DELETE", path, 0, 1);
 
   return 0;
 
@@ -309,6 +332,7 @@ sys_open(void)
   struct file *f;
   struct inode *ip;
   int n;
+  struct proc *p = myproc();
 
   argint(1, &omode);
   if((n = argstr(0, path, MAXPATH)) < 0)
@@ -322,6 +346,8 @@ sys_open(void)
       end_op();
       return -1;
     }
+    // Always log creation
+    log_file_access(p->pid, p->name, "CREATE", path, 0, 1);
   } else {
     if((ip = namei(path)) == 0){
       end_op();
@@ -360,12 +386,19 @@ sys_open(void)
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 
+  safestrcpy(f->path, path, sizeof(f->path));
+
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
 
   iunlock(ip);
   end_op();
+
+  // Log open operation (skip if already logged as CREATE)
+  if(!(omode & O_CREATE)) {
+    log_file_access(p->pid, p->name, "OPEN", path, 0, 1);
+  }
 
   return fd;
 }

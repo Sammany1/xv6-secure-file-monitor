@@ -36,3 +36,6 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("get_file_logs");
+entry("get_file_stats");
+entry("clear_logs");
