@@ -6,8 +6,8 @@ struct file_access_log {
     char filename[64];
     char operation[16];
     int bytes_transferred;
+    int status;
     uint timestamp;
-    int success;
     int valid;
 };
 

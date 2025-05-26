@@ -17,14 +17,16 @@
 #define OP_CREATE 5
 #define OP_DELETE 6
 
+extern struct spinlock tickslock;
+
 struct file_access_log {
     int pid;
     char proc_name[16];
     char filename[FILENAME_MAX];
     char operation[OPERATION_MAX];
     int bytes_transferred;
+    int status;  // 1 for status, 0 for failure
     uint timestamp;
-    int success;  // 1 for success, 0 for failure
     int valid;
 };
 
@@ -43,8 +45,8 @@ filelog_init(void)
     initlock(&access_log_buffer.lock, "filelog");
     access_log_buffer.next_index = 0;
     access_log_buffer.total_accesses = 0;
-    
-    for(int i = 0; i < MAX_LOG_ENTRIES; i++) {
+
+    for(int i=0; i<MAX_LOG_ENTRIES; i++){
         access_log_buffer.entries[i].valid = 0;
     }
 }
@@ -88,8 +90,7 @@ should_log_operation(char *proc_name, char *operation, int bytes, int file_type)
 
 // Main logging function with built-in filtering
 void
-log_file_access(int pid, char *proc_name, char *filename, char *operation, 
-                int bytes, int success)
+log_file_access(int pid, char *proc_name, char *operation, char *filename, int bytes, int status)
 {
     // First filter: check if we should log this process
     if(!should_log_process(proc_name)) {
@@ -116,27 +117,7 @@ log_file_access(int pid, char *proc_name, char *filename, char *operation,
     safestrcpy(entry->operation, operation, sizeof(entry->operation));
     entry->bytes_transferred = bytes;
     entry->timestamp = ticks;
-    entry->success = success;
-    entry->valid = 1;
-    access_log_buffer.next_index = (access_log_buffer.next_index + 1) % MAX_LOG_ENTRIES;
-    access_log_buffer.total_accesses++;
-    release(&access_log_buffer.lock);
-}
-
-// Simple logging function without filtering (for when you want to force logging)
-void
-log_file_access_force(int pid, char *proc_name, char *filename, char *operation, 
-                     int bytes, int success)
-{
-    acquire(&access_log_buffer.lock);
-    struct file_access_log *entry = &access_log_buffer.entries[access_log_buffer.next_index];
-    entry->pid = pid;
-    safestrcpy(entry->proc_name, proc_name, sizeof(entry->proc_name));
-    safestrcpy(entry->filename, filename, sizeof(entry->filename));
-    safestrcpy(entry->operation, operation, sizeof(entry->operation));
-    entry->bytes_transferred = bytes;
-    entry->timestamp = ticks;
-    entry->success = success;
+    entry->status = status;
     entry->valid = 1;
     access_log_buffer.next_index = (access_log_buffer.next_index + 1) % MAX_LOG_ENTRIES;
     access_log_buffer.total_accesses++;
@@ -196,8 +177,7 @@ get_file_stats(char *filename, uint64 user_stats)
     acquire(&access_log_buffer.lock);
     
     for(int i = 0; i < MAX_LOG_ENTRIES; i++) {
-        if(access_log_buffer.entries[i].valid && 
-           strncmp(access_log_buffer.entries[i].filename, filename, FILENAME_MAX) == 0) {
+        if(access_log_buffer.entries[i].valid && strncmp(access_log_buffer.entries[i].filename, filename, FILENAME_MAX) == 0) {
             stats.total_accesses++;
             
             if(strncmp(access_log_buffer.entries[i].operation, "READ", 4) == 0) {
@@ -224,7 +204,7 @@ void
 clear_file_logs(void)
 {
     acquire(&access_log_buffer.lock);
-    
+
     for(int i = 0; i < MAX_LOG_ENTRIES; i++) {
         access_log_buffer.entries[i].valid = 0;
     }

@@ -81,13 +81,7 @@ sys_read(void)
 
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    char filename[16];
-    if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
-      safestrcpy(filename, "file", sizeof(filename));
-    } else {
-      safestrcpy(filename, "device", sizeof(filename));
-    }
-    log_file_access(proc->pid, proc->name, filename, "READ", result, 1);
+    log_file_access(proc->pid, proc->name, "READ", f->path, result, 1);
   }
   return result;
 }
@@ -109,13 +103,7 @@ sys_write(void)
   
   // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    char filename[16];
-    if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
-      safestrcpy(filename, "file", sizeof(filename));
-    } else {
-      safestrcpy(filename, "stdout", sizeof(filename));
-    }
-    log_file_access(proc->pid, proc->name, filename, "WRITE", result, 1);
+    log_file_access(proc->pid, proc->name, "WRITE", f->path, result, 1);
   }
   return result;
 }
@@ -130,14 +118,8 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
   
-  // Simple logging call - let filelog.c handle the filtering
-  char filename[16];
-  if(f->type == FD_INODE && f->ip && f->ip->type == T_FILE) {
-    safestrcpy(filename, "file", sizeof(filename));
-  } else {
-    safestrcpy(filename, "device", sizeof(filename));
-  }
-  log_file_access(proc->pid, proc->name, filename, "CLOSE", 0, 1);
+  // Simple logging call
+  log_file_access(proc->pid, proc->name, "CLOSE", f->path, 0, 1);
 
   myproc()->ofile[fd] = 0;
   fileclose(f);
@@ -273,7 +255,7 @@ sys_unlink(void)
   end_op();
 
   // Simple logging call
-  log_file_access(proc->pid, proc->name, path, "DELETE", 0, 1);
+  log_file_access(proc->pid, proc->name, "DELETE", path, 0, 1);
 
   return 0;
 
@@ -365,7 +347,7 @@ sys_open(void)
       return -1;
     }
     // Always log creation
-    log_file_access(p->pid, p->name, path, "CREATE", 0, 1);
+    log_file_access(p->pid, p->name, "CREATE", path, 0, 1);
   } else {
     if((ip = namei(path)) == 0){
       end_op();
@@ -404,6 +386,8 @@ sys_open(void)
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 
+  safestrcpy(f->path, path, sizeof(f->path));
+
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
@@ -413,7 +397,7 @@ sys_open(void)
 
   // Log open operation (skip if already logged as CREATE)
   if(!(omode & O_CREATE)) {
-    log_file_access(p->pid, p->name, path, "OPEN", 0, 1);
+    log_file_access(p->pid, p->name, "OPEN", path, 0, 1);
   }
 
   return fd;

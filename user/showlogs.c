@@ -2,6 +2,43 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
+void pad(const char *s, int width) {
+    int len = strlen(s);
+    printf("%s", s);
+    for(int i = len; i < width; i++)
+        printf(" ");
+}
+
+void pad_num(int num, int width) {
+    char buf[16];
+    int len = 0, n = num, i = 0;
+
+    // Convert number to string (handle 0 specially)
+    if(n == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        len = 1;
+    } else {
+        // Convert to string in reverse
+        while(n > 0 && i < sizeof(buf)-1) {
+            buf[i++] = '0' + (n % 10);
+            n /= 10;
+        }
+        buf[i] = '\0';
+        // Reverse the string
+        for(int j = 0; j < i/2; j++) {
+            char tmp = buf[j];
+            buf[j] = buf[i-1-j];
+            buf[i-1-j] = tmp;
+        }
+        len = i;
+    }
+
+    printf("%s", buf);
+    for(int j = len; j < width; j++)
+        printf(" ");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -33,7 +70,7 @@ main(int argc, char *argv[])
     }
     
     // Show recent file access logs - reduced buffer size
-    struct file_access_log logs[20];  // Reduced from 100 to 20
+    struct file_access_log logs[20];  
     int count = get_file_logs(logs, 20);
     
     if(count < 0) {
@@ -42,18 +79,17 @@ main(int argc, char *argv[])
     }
     
     printf("Recent File Access Log (%d entries):\n", count);
-    printf("PID\tProcess\t\tOperation\tFile\t\tBytes\tStatus\tTime\n");
-    printf("---\t-------\t\t---------\t----\t\t-----\t------\t----\n");
+    printf("PID    Process    Operation    File             Bytes    Status    Time\n");
+    printf("---    -------    ---------    -------------    -----    ------    ----\n");
     
     for(int i = 0; i < count; i++) {
-        printf("%d\t%s\t\t%s\t\t%s\t%d\t%s\t%d\n",
-               logs[i].pid,
-               logs[i].proc_name,
-               logs[i].operation,
-               logs[i].filename,
-               logs[i].bytes_transferred,
-               logs[i].success ? "OK" : "FAIL",
-               logs[i].timestamp);
+        pad_num(logs[i].pid, 3);        printf("    ");
+        pad(logs[i].proc_name, 7);     printf("    ");
+        pad(logs[i].operation, 9);      printf("    ");
+        pad(logs[i].filename, 13);      printf("    ");
+        pad_num(logs[i].bytes_transferred, 5); printf("    ");
+        pad(logs[i].status ? "OK" : "FAIL", 6); printf("    ");
+        pad_num(logs[i].timestamp, 4); printf("\n");
     }
     
     exit(0);
