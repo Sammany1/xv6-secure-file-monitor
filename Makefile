@@ -31,7 +31,9 @@ OBJS = \
   $K/kernelvec.o \
   $K/plic.o \
   $K/virtio_disk.o \
-  $K/filelog.o
+  $K/filelog.o \
+  $K/suspicious_detect.o
+
 
 OBJS_KCSAN = \
   $K/start.o \
@@ -377,3 +379,4 @@ zipball: clean submit-check
 	git archive --verbose --format zip --output lab.zip HEAD
 
 .PHONY: zipball clean grade submit-check
+

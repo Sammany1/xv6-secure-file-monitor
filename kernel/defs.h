@@ -41,6 +41,10 @@ int             get_file_logs(uint64 user_buf, int max_entries);
 int             get_file_stats(char *filename, uint64 user_stats);
 void            clear_file_logs(void);
 
+// suspicious_detect.c
+void            detector_init(void);
+void            check_suspicious(int pid, char *proc_name, char *operation, char *filename, int status);
+
 // fs.c
 void            fsinit(int);
 int             dirlink(struct inode*, char*, uint);
