@@ -31,7 +31,8 @@ OBJS = \
   $K/kernelvec.o \
   $K/plic.o \
   $K/virtio_disk.o \
-  $K/filelog.o
+  $K/filelog.o   \
+  $K/loghistory.o
 
 OBJS_KCSAN = \
   $K/start.o \
@@ -197,6 +198,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_showlogs\
 	$U/_testlog\
+	$U/_show_loghistory\
 
 
 

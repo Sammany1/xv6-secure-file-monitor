@@ -8,6 +8,9 @@
 #define MAX_LOG_ENTRIES 20
 #define FILENAME_MAX 64
 #define OPERATION_MAX 16
+/*calling the log history*/
+void loghistory_init(void);
+void push_loghistory(struct file_access_log *entry);
 
 // Operation types
 #define OP_OPEN   1
