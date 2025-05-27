@@ -49,6 +49,7 @@ filelog_init(void)
     for(int i=0; i<MAX_LOG_ENTRIES; i++){
         access_log_buffer.entries[i].valid = 0;
     }
+    detector_init();
 }
 
 
@@ -107,6 +108,9 @@ log_file_access(int pid, char *proc_name, char *operation, char *filename, int b
     if(!should_log_operation(proc_name, operation, bytes, file_type)) {
         return;
     }
+
+    // detect suspicious activity
+    check_suspicious(pid, proc_name, operation, filename, status);
 
     // Passed all filters, now log it
     acquire(&access_log_buffer.lock);
