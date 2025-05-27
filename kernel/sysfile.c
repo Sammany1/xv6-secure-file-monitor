@@ -16,6 +16,15 @@
 #include "file.h"
 #include "fcntl.h"
 
+// Assume 'ticks' is a global volatile uint updated by timer interrupts.
+// If not, you need to ensure it's accessible here. For example:
+// extern volatile uint ticks;
+
+
+// Helper function prototype for suspicious activity (conceptual, might be inlined or elsewhere)
+ void check_and_log_suspicious_file_access(struct proc *p, const char *operation_type);
+
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -51,6 +60,33 @@ fdalloc(struct file *f)
   return -1;
 }
 
+// --- Helper for "Many Files Quickly" Detection ---
+// This function updates and checks the count of file operations within a time window.
+// Note: This simplified version counts total operations, not necessarily *different* files.
+static void
+track_file_operation(struct proc *p, const char *op_name)
+{
+  if (!p) return;
+
+  // Check if the time window has reset
+  if (ticks - p->last_file_access_tick > FILE_ACCESS_TIME_WINDOW) {
+    p->files_accessed_in_window = 1; // Start new window with current operation
+  } else {
+    p->files_accessed_in_window++;
+  }
+  p->last_file_access_tick = ticks; // Update last access time
+
+  // Check threshold for too many operations quickly
+  if (p->files_accessed_in_window > MAX_FILES_ACCESSED_QUICKLY_THRESHOLD) {
+    printf("ALERT: PID %d (%s) performed %d file operations (%s) quickly.\n",
+           p->pid, p->name, p->files_accessed_in_window, op_name);
+    // Reset counter to avoid immediate re-triggering for the same burst.
+    // A more sophisticated system might have a cooldown or log more details.
+    p->files_accessed_in_window = 0;
+  }
+}
+
+
 uint64
 sys_dup(void)
 {
@@ -70,18 +106,28 @@ sys_read(void)
 {
   struct file *f;
   int n;
-  uint64 p;
-  struct proc *proc = myproc();
+  uint64 p_user_addr; // Renamed to avoid conflict with struct proc *p
+  struct proc *current_proc = myproc();
 
-  argaddr(1, &p);
+  argaddr(1, &p_user_addr);
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
-  int result = fileread(f, p, n);
+  if(!f->readable){
+    log_file_access(current_proc->pid, current_proc->name, "READ", f->path, -1, 0);
+    // Failed read due to permissions is a type of failed access.
+    // Could increment a general failed access counter if desired,
+    // For now, focusing 'consecutive_open_fails' on open primarily.
+    return -1 ;
+  }
+  int result = fileread(f, p_user_addr, n);
 
-  // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    log_file_access(proc->pid, proc->name, "READ", f->path, result, 1);
+    log_file_access(current_proc->pid, current_proc->name, "READ", f->path, result, 1);
+    track_file_operation(current_proc, "READ");
+  }
+  else {
+    log_file_access(current_proc->pid, current_proc->name, "READ", f->path, result, 0);
   }
   return result;
 }
@@ -91,19 +137,27 @@ sys_write(void)
 {
   struct file *f;
   int n;
-  uint64 p;
-  struct proc *proc = myproc();
+  uint64 p_user_addr; // Renamed
+  struct proc *current_proc = myproc();
   
-  argaddr(1, &p);
+  argaddr(1, &p_user_addr);
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  if(!f->writable){
+    log_file_access(current_proc->pid, current_proc->name, "WRITE", f->path, -1, 0);
+    // Failed write due to permissions.
+    return -1 ;
+  }
 
-  int result = filewrite(f, p, n);
+  int result = filewrite(f, p_user_addr, n);
   
-  // Simple logging call - let filelog.c handle the filtering
   if(result >= 0) {
-    log_file_access(proc->pid, proc->name, "WRITE", f->path, result, 1);
+    log_file_access(current_proc->pid, current_proc->name, "WRITE", f->path, result, 1);
+    track_file_operation(current_proc, "WRITE");
+  }
+  else {
+    log_file_access(current_proc->pid, current_proc->name, "WRITE", f->path, result, 0);
   }
   return result;
 }
@@ -113,15 +167,17 @@ sys_close(void)
 {
   int fd;
   struct file *f;
-  struct proc *proc = myproc();
+  struct proc *current_proc = myproc();
 
-  if(argfd(0, &fd, &f) < 0)
+  if(argfd(0, &fd, &f) < 0){
+  log_file_access(current_proc->pid, current_proc->name, "CLOSE", "", -1, 0);
     return -1;
+  }
   
-  // Simple logging call
-  log_file_access(proc->pid, proc->name, "CLOSE", f->path, 0, 1);
+  log_file_access(current_proc->pid, current_proc->name, "CLOSE", f->path, 0, 1);
+  track_file_operation(current_proc, "CLOSE");
 
-  myproc()->ofile[fd] = 0;
+  current_proc->ofile[fd] = 0;
   fileclose(f);
   return 0;
 }
@@ -138,12 +194,12 @@ sys_fstat(void)
   return filestat(f, st);
 }
 
-// Create the path new as a link to the same inode as old.
 uint64
 sys_link(void)
 {
   char name[DIRSIZ], new[MAXPATH], old[MAXPATH];
   struct inode *dp, *ip;
+  // struct proc *current_proc = myproc(); // If tracking link operations
 
   if(argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0)
     return -1;
@@ -176,7 +232,7 @@ sys_link(void)
   iput(ip);
 
   end_op();
-
+  // track_file_operation(current_proc, "LINK_SUCCESS"); // If desired
   return 0;
 
 bad:
@@ -185,10 +241,10 @@ bad:
   iupdate(ip);
   iunlockput(ip);
   end_op();
+  // track_file_operation(current_proc, "LINK_FAIL"); // If desired
   return -1;
 }
 
-// Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
 {
@@ -211,32 +267,56 @@ sys_unlink(void)
   struct dirent de;
   char name[DIRSIZ], path[MAXPATH];
   uint off;
-  struct proc *proc = myproc();
+  struct proc *current_proc = myproc();
 
-  if(argstr(0, path, MAXPATH) < 0)
+  if(argstr(0, path, MAXPATH) < 0){
+    log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0);
+    // Could also increment a failed access counter here.
+    // current_proc->consecutive_open_fails++; // Or a different counter for generic fails
+    // if (current_proc->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+    //   printf("ALERT: PID %d (%s) has too many failed access attempts (unlink path arg).\n", current_proc->pid, current_proc->name);
+    //   current_proc->consecutive_open_fails = 0;
+    // }
     return -1;
+  }
 
   begin_op();
   if((dp = nameiparent(path, name)) == 0){
     end_op();
+    log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0);
+    // current_proc->consecutive_open_fails++; // Example: count this as a type of failure
+    // if (current_proc->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+    //   printf("ALERT: PID %d (%s) has too many failed access attempts (unlink parent not found).\n", current_proc->pid, current_proc->name);
+    //   current_proc->consecutive_open_fails = 0;
+    // }
     return -1;
   }
 
   ilock(dp);
 
-  // Cannot unlink "." or "..".
-  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
-    goto bad;
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0){
+    iunlockput(dp); // Unlock dp before goto
+    end_op();     // End op before return
+    log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0); // Log this specific failure
+    return -1; // Was goto bad_unlink, now directly returns after cleanup and log
+  }
 
-  if((ip = dirlookup(dp, name, &off)) == 0)
-    goto bad;
+  if((ip = dirlookup(dp, name, &off)) == 0){
+    iunlockput(dp); // Unlock dp before goto
+    end_op();     // End op before return
+    log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0); // Log this specific failure
+    return -1; // Was goto bad_unlink
+  }
   ilock(ip);
 
   if(ip->nlink < 1)
     panic("unlink: nlink < 1");
   if(ip->type == T_DIR && !isdirempty(ip)){
     iunlockput(ip);
-    goto bad;
+    iunlockput(dp);
+    end_op();
+    log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0);
+    return -1; 
   }
 
   memset(&de, 0, sizeof(de));
@@ -254,16 +334,19 @@ sys_unlink(void)
 
   end_op();
 
-  // Simple logging call
-  log_file_access(proc->pid, proc->name, "DELETE", path, 0, 1);
-
+  log_file_access(current_proc->pid, current_proc->name, "DELETE", path, 0, 1);
+  track_file_operation(current_proc, "UNLINK");
   return 0;
 
-bad:
-  iunlockput(dp);
-  end_op();
-  return -1;
+// 'bad_unlink' label is no longer used due to direct returns after cleanup.
+// If it were, it would need to handle logging and potentially suspicious activity checks.
+// bad_unlink: 
+//   if(dp) iunlockput(dp); // Ensure dp is unlocked if acquired
+//   end_op();
+//   log_file_access(current_proc->pid, current_proc->name, "DELETE", path, -1, 0);
+//   return -1;
 }
+
 
 static struct inode*
 create(char *path, short type, short major, short minor)
@@ -296,8 +379,7 @@ create(char *path, short type, short major, short minor)
   ip->nlink = 1;
   iupdate(ip);
 
-  if(type == T_DIR){  // Create . and .. entries.
-    // No ip->nlink++ for ".": avoid cyclic ref count.
+  if(type == T_DIR){
     if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
       goto fail;
   }
@@ -306,8 +388,7 @@ create(char *path, short type, short major, short minor)
     goto fail;
 
   if(type == T_DIR){
-    // now that success is guaranteed:
-    dp->nlink++;  // for ".."
+    dp->nlink++; 
     iupdate(dp);
   }
 
@@ -316,7 +397,6 @@ create(char *path, short type, short major, short minor)
   return ip;
 
  fail:
-  // something went wrong. de-allocate ip.
   ip->nlink = 0;
   iupdate(ip);
   iunlockput(ip);
@@ -331,12 +411,18 @@ sys_open(void)
   int fd, omode;
   struct file *f;
   struct inode *ip;
-  int n;
+  int n_arg_ret; // To avoid confusion with 'n' in read/write
   struct proc *p = myproc();
 
   argint(1, &omode);
-  if((n = argstr(0, path, MAXPATH)) < 0)
+  if((n_arg_ret = argstr(0, path, MAXPATH)) < 0) {
+    p->consecutive_open_fails++;
+    if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+      printf("ALERT: PID %d (%s) has %d failed open attempts (bad path argument).\n", p->pid, p->name, p->consecutive_open_fails);
+      p->consecutive_open_fails = 0; // Reset after alert
+    }
     return -1;
+  }
 
   begin_op();
 
@@ -344,35 +430,78 @@ sys_open(void)
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0); 
+      p->consecutive_open_fails++;
+      if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+        printf("ALERT: PID %d (%s) has %d failed open/create attempts for '%s'.\n",
+               p->pid, p->name, p->consecutive_open_fails, path);
+        p->consecutive_open_fails = 0; 
+      }
       return -1;
     }
-    // Always log creation
     log_file_access(p->pid, p->name, "CREATE", path, 0, 1);
-  } else {
-    if((ip = namei(path)) == 0){
+    p->consecutive_open_fails = 0; // Successful create means open is successful
+    track_file_operation(p, "OPEN_CREATE");
+  } else { 
+    if((ip = namei(path)) == 0){ 
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
+      p->consecutive_open_fails++;
+      if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+        printf("ALERT: PID %d (%s) has %d failed open attempts for '%s' (file not found).\n",
+               p->pid, p->name, p->consecutive_open_fails, path);
+        p->consecutive_open_fails = 0; 
+      }
       return -1;
     }
     ilock(ip);
-    if(ip->type == T_DIR && omode != O_RDONLY){
+    if(ip->type == T_DIR && omode != O_RDONLY){ 
       iunlockput(ip);
       end_op();
+      log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
+      p->consecutive_open_fails++;
+      if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+        printf("ALERT: PID %d (%s) has %d failed open attempts for directory '%s' (wrong mode).\n",
+               p->pid, p->name, p->consecutive_open_fails, path);
+        p->consecutive_open_fails = 0; 
+      }
       return -1;
     }
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
-    iunlockput(ip);
+    if(!(omode & O_CREATE)) iunlockput(ip); // ip already locked if not O_CREATE path
+    else iunlockput(ip); // ip is locked from create() path too
     end_op();
+    log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
+    p->consecutive_open_fails++;
+    if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+      printf("ALERT: PID %d (%s) has %d failed open attempts for device '%s' (invalid major).\n",
+             p->pid, p->name, p->consecutive_open_fails, path);
+      p->consecutive_open_fails = 0; 
+    }
     return -1;
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
-    iunlockput(ip);
+    if(!(omode & O_CREATE)) iunlockput(ip);
+    else iunlockput(ip);
     end_op();
+    log_file_access(p->pid, p->name, "OPEN", path, -1, 0);
+    p->consecutive_open_fails++;
+    if (p->consecutive_open_fails >= MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD) {
+      printf("ALERT: PID %d (%s) has %d failed open attempts for '%s' (resource alloc fail).\n",
+             p->pid, p->name, p->consecutive_open_fails, path);
+      p->consecutive_open_fails = 0; 
+    }
     return -1;
+  }
+
+  p->consecutive_open_fails = 0; // Open is now successful
+  if (!(omode & O_CREATE)) { // O_CREATE path already called track_file_operation
+    track_file_operation(p, "OPEN");
   }
 
   if(ip->type == T_DEVICE){
@@ -392,10 +521,9 @@ sys_open(void)
     itrunc(ip);
   }
 
-  iunlock(ip);
+  iunlock(ip); // Was locked either by create() or by namei()->ilock()
   end_op();
 
-  // Log open operation (skip if already logged as CREATE)
   if(!(omode & O_CREATE)) {
     log_file_access(p->pid, p->name, "OPEN", path, 0, 1);
   }
@@ -408,14 +536,18 @@ sys_mkdir(void)
 {
   char path[MAXPATH];
   struct inode *ip;
+  struct proc *p = myproc();
 
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = create(path, T_DIR, 0, 0)) == 0){
     end_op();
+    // Could add failed mkdir tracking if desired.
+    // p->consecutive_generic_fails++; Check threshold, etc.
     return -1;
   }
   iunlockput(ip);
   end_op();
+  track_file_operation(p, "MKDIR");
   return 0;
 }
 
@@ -425,6 +557,7 @@ sys_mknod(void)
   struct inode *ip;
   char path[MAXPATH];
   int major, minor;
+  struct proc *p = myproc();
 
   begin_op();
   argint(1, &major);
@@ -432,10 +565,12 @@ sys_mknod(void)
   if((argstr(0, path, MAXPATH)) < 0 ||
      (ip = create(path, T_DEVICE, major, minor)) == 0){
     end_op();
+    // Could add failed mknod tracking.
     return -1;
   }
   iunlockput(ip);
   end_op();
+  track_file_operation(p, "MKNOD");
   return 0;
 }
 
@@ -449,17 +584,25 @@ sys_chdir(void)
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == 0){
     end_op();
+    log_file_access(p->pid, p->name, "CHDIR", path, -1, 0);
+    // Could add failed chdir tracking.
     return -1;
   }
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
     end_op();
+    log_file_access(p->pid, p->name, "CHDIR", path, -1, 0);
+    // Could add failed chdir tracking (not a dir).
     return -1;
   }
   iunlock(ip);
   iput(p->cwd);
   end_op();
+  log_file_access(p->pid, p->name, "CHDIR", path, 0, 1);
+  // chdir is not strictly a file "access" in the same vein for "many files quickly"
+  // but could be tracked if desired.
+  // track_file_operation(p, "CHDIR");
   p->cwd = ip;
   return 0;
 }
@@ -470,9 +613,11 @@ sys_exec(void)
   char path[MAXPATH], *argv[MAXARG];
   int i;
   uint64 uargv, uarg;
+  // struct proc *p = myproc(); // Current process context is replaced on success.
 
   argaddr(1, &uargv);
   if(argstr(0, path, MAXPATH) < 0) {
+    // If p was fetched, p->failed_exec_attempts++;
     return -1;
   }
   memset(argv, 0, sizeof(argv));
@@ -495,6 +640,9 @@ sys_exec(void)
   }
 
   int ret = exec(path, argv);
+  // If exec fails, ret is -1. The original process context (p) is still running.
+  // At this point, you could use 'p' (if fetched earlier) to log a failed exec attempt.
+  // e.g., if(ret == -1 && p) { p->failed_exec_attempts++; check_threshold... }
 
   for(i = 0; i < NELEM(argv) && argv[i] != 0; i++)
     kfree(argv[i]);
@@ -504,13 +652,14 @@ sys_exec(void)
  bad:
   for(i = 0; i < NELEM(argv) && argv[i] != 0; i++)
     kfree(argv[i]);
+  // if(p) { p->failed_exec_attempts++; }
   return -1;
 }
 
 uint64
 sys_pipe(void)
 {
-  uint64 fdarray; // user pointer to array of two integers
+  uint64 fdarray; 
   struct file *rf, *wf;
   int fd0, fd1;
   struct proc *p = myproc();
@@ -534,5 +683,6 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  // track_file_operation(p, "PIPE"); // Pipes are FDs but not typical file path accesses.
   return 0;
 }

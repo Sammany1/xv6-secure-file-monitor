@@ -83,6 +83,11 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
 struct proc {
+  // ... other existing fields ...
+  int consecutive_open_fails;     // For Feature 5: Counter for failed open attempts
+  int files_accessed_in_window; // For Feature 5: Counter for file operations in a time window
+  uint last_file_access_tick;    // For Feature 5: Timestamp of the last file operation for windowing
+  // To track *different* files quickly, you'd need a more complex structure here
   struct spinlock lock;
 
   // p->lock must be held when using these:

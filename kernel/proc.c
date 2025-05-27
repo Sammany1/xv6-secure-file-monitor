@@ -111,19 +111,25 @@ allocproc(void)
 {
   struct proc *p;
 
+  // Search for an UNUSED process slot
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
-      goto found;
+      goto found; // Found an unused slot, p is now valid
     } else {
       release(&p->lock);
     }
   }
-  return 0;
+  return 0; // No free procs
 
 found:
   p->pid = allocpid();
   p->state = USED;
+
+  // Initialize your new fields here, now that p is a valid process
+  p->consecutive_open_fails = 0;
+  p->files_accessed_in_window = 0;
+  p->last_file_access_tick = 0; // Or set to current 'ticks' if 'ticks' is available and makes sense here
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){

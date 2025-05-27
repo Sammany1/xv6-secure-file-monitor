@@ -30,4 +30,6 @@
 #define USERSTACK    1     // user stack pages
 #endif
 
-
+#define MAX_CONSECUTIVE_OPEN_FAILS_THRESHOLD    3
+#define MAX_FILES_ACCESSED_QUICKLY_THRESHOLD    10 // Max operations in a window
+#define FILE_ACCESS_TIME_WINDOW  100             // Time window in clock ticks (e.g., 1 second if 100 ticks/sec)
