@@ -23,3 +23,6 @@
 #define SYS_get_file_logs 22
 #define SYS_get_file_stats 23
 #define SYS_clear_logs 24
+#define SYS_get_history_logs 25
+#define SYS_get_history_stats 26
+#define SYS_clear_history_logs 27

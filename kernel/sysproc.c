@@ -122,3 +122,42 @@ sys_clear_logs(void)
   clear_file_logs();
   return 0;
 }
+
+uint64
+sys_get_history_logs(void)
+{
+  uint64 user_buf;
+  int max_entries, offset;
+  
+  argaddr(0, &user_buf);
+  argint(1, &max_entries);
+  argint(2, &offset);
+  
+  return get_history_logs(user_buf, max_entries, offset);
+}
+
+uint64
+sys_get_history_stats(void)
+{
+  uint64 total_logs_ptr, total_chunks_ptr;
+  int total_logs, total_chunks;
+  
+  argaddr(0, &total_logs_ptr);
+  argaddr(1, &total_chunks_ptr);
+  
+  get_history_stats(&total_logs, &total_chunks);
+  
+  if(copyout(myproc()->pagetable, total_logs_ptr, (char*)&total_logs, sizeof(int)) < 0)
+    return -1;
+  if(copyout(myproc()->pagetable, total_chunks_ptr, (char*)&total_chunks, sizeof(int)) < 0)
+    return -1;
+    
+  return 0;
+}
+
+uint64
+sys_clear_history_logs(void)
+{
+  clear_history_logs();
+  return 0;
+}
