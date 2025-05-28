@@ -200,6 +200,8 @@ UPROGS=\
 	$U/_zombie\
 	$U/_showlogs\
 	$U/_testlog\
+	$U/_showhistory\
+	
 
 
 
