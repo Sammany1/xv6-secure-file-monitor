@@ -104,6 +104,9 @@ extern uint64 sys_close(void);
 extern uint64 sys_get_file_logs(void);
 extern uint64 sys_get_file_stats(void);
 extern uint64 sys_clear_logs(void);
+extern uint64 sys_get_history_logs(void);
+extern uint64 sys_get_history_stats(void);
+extern uint64 sys_clear_history_logs(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -132,6 +135,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_get_file_logs] sys_get_file_logs,
 [SYS_get_file_stats] sys_get_file_stats,
 [SYS_clear_logs] sys_clear_logs,
+[SYS_get_history_logs] sys_get_history_logs,
+[SYS_get_history_stats] sys_get_history_stats,
+[SYS_clear_history_logs] sys_clear_history_logs,
 };
 
 void

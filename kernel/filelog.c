@@ -4,39 +4,15 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-
-#define MAX_LOG_ENTRIES 20
-#define FILENAME_MAX 64
-#define OPERATION_MAX 16
-
-// Operation types
-#define OP_OPEN   1
-#define OP_READ   2
-#define OP_WRITE  3
-#define OP_CLOSE  4
-#define OP_CREATE 5
-#define OP_DELETE 6
+#include "filelog.h"
 
 extern struct spinlock tickslock;
-
-struct file_access_log {
-    int pid;
-    char proc_name[16];
-    char filename[FILENAME_MAX];
-    char operation[OPERATION_MAX];
-    int bytes_transferred;
-    int status;  // 1 for status, 0 for failure
-    uint timestamp;
-    int valid;
-};
-
 struct {
     struct spinlock lock;
     struct file_access_log entries[MAX_LOG_ENTRIES];
     int next_index;
     int total_accesses;
 } access_log_buffer;
-
 
 // Initialize the file access logging system
 void
@@ -52,13 +28,13 @@ filelog_init(void)
     detector_init();
 }
 
-
 // Helper function to determine if we should log this process
 static int
 should_log_process(char *proc_name)
 {
     // Only skip logging for showlogs utility and init
     if(strncmp(proc_name, "showlogs", 8) == 0) return 0;
+    if(strncmp(proc_name, "showhistory", 8) == 0) return 0;
     if(strncmp(proc_name, "init", 4) == 0) return 0;
     if(strncmp(proc_name, "ls", 2) == 0) return 0;
     return 1; // log all other processes, including sh, echo, ls, etc.
@@ -123,8 +99,26 @@ log_file_access(int pid, char *proc_name, char *operation, char *filename, int b
     entry->timestamp = ticks;
     entry->status = status;
     entry->valid = 1;
+
+    // Update index and check if buffer is full
     access_log_buffer.next_index = (access_log_buffer.next_index + 1) % MAX_LOG_ENTRIES;
     access_log_buffer.total_accesses++;
+
+    // If we've wrapped around to 0, transfer to long-term storage
+    if(access_log_buffer.next_index == 0) {
+        // Copy all current entries for transfer
+        struct file_access_log transfer_buffer[MAX_LOG_ENTRIES];
+        for(int i = 0; i < MAX_LOG_ENTRIES; i++) {
+            transfer_buffer[i] = access_log_buffer.entries[i];
+        }
+        
+        release(&access_log_buffer.lock);
+        
+        // Transfer to history storage (outside lock to avoid blocking)
+        transfer_to_history(transfer_buffer, MAX_LOG_ENTRIES);
+        return;
+    }
+    
     release(&access_log_buffer.lock);
 }
 

@@ -39,3 +39,6 @@ entry("uptime");
 entry("get_file_logs");
 entry("get_file_stats");
 entry("clear_logs");
+entry("get_history_logs");
+entry("get_history_stats");
+entry("clear_history_logs");
