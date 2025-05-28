@@ -31,8 +31,10 @@ OBJS = \
   $K/kernelvec.o \
   $K/plic.o \
   $K/virtio_disk.o \
-  $K/filelog.o   \
-  $K/loghistory.o
+  $K/filelog.o \
+  $K/filelog_history.o \
+  $K/suspicious_detect.o
+
 
 OBJS_KCSAN = \
   $K/start.o \
@@ -197,8 +199,8 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_showlogs\
+	$U/_showhistory\
 	$U/_testlog\
-	$U/_show_loghistory\
 
 
 
@@ -379,3 +381,4 @@ zipball: clean submit-check
 	git archive --verbose --format zip --output lab.zip HEAD
 
 .PHONY: zipball clean grade submit-check
+

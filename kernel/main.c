@@ -28,6 +28,7 @@ main()
     iinit();         // inode table
     fileinit();      // file table
     filelog_init();  // Initialize file access logging
+    history_log_init(); // Initialize history storage
     virtio_disk_init(); // emulated hard disk
     userinit();      // first user process
     __sync_synchronize();

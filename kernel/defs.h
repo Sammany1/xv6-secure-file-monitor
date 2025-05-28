@@ -1,3 +1,5 @@
+#include "filelog.h"
+
 struct buf;
 struct context;
 struct file;
@@ -40,6 +42,17 @@ void            log_file_access(int pid, char *proc_name, char *operation, char 
 int             get_file_logs(uint64 user_buf, int max_entries);
 int             get_file_stats(char *filename, uint64 user_stats);
 void            clear_file_logs(void);
+
+// suspicious_detect.c
+void            detector_init(void);
+void            check_suspicious(int pid, char *proc_name, char *operation, char *filename, int status);
+
+// filelog_history.c
+void            history_log_init(void);
+int             transfer_to_history(struct file_access_log *buffer, int count);
+int             get_history_logs(uint64 user_buf, int max_entries, int offset);
+void            get_history_stats(int *total_logs, int *total_chunks);
+void            clear_history_logs(void);
 
 // fs.c
 void            fsinit(int);

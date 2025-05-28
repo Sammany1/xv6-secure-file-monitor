@@ -1,24 +1,6 @@
+#include "kernel/filelog.h"
+
 struct stat;
-
-struct file_access_log {
-    int pid;
-    char proc_name[16];
-    char filename[64];
-    char operation[16];
-    int bytes_transferred;
-    int status;
-    uint timestamp;
-    int valid;
-};
-
-struct file_stats {
-    int total_accesses;
-    int read_count;
-    int write_count;
-    int total_bytes_read;
-    int total_bytes_written;
-};
-
 
 // system calls
 int fork(void);
@@ -45,6 +27,9 @@ int uptime(void);
 int get_file_logs(struct file_access_log *logs, int max_entries);
 int get_file_stats(char *filename, struct file_stats *stats);
 int clear_logs(void);
+int get_history_logs(struct file_access_log *logs, int max_entries, int offset);
+int get_history_stats(int *total_logs, int *total_chunks);
+int clear_history_logs(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
