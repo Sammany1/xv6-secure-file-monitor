@@ -33,7 +33,8 @@ OBJS = \
   $K/virtio_disk.o \
   $K/filelog.o \
   $K/suspicious_detect.o \
-  $K/filelog_history.o
+  $K/filelog_history.o \
+  $K/timeutil.o
 
 
 OBJS_KCSAN = \
@@ -129,6 +130,10 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
+.PHONY: kernel/boottime.h
+kernel/boottime.h:
+	./gentime.sh
+
 $K/kernel: $(OBJS) $(OBJS_KCSAN) $K/kernel.ld $U/initcode
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) $(OBJS_KCSAN)
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
@@ -139,6 +144,8 @@ $(OBJS): EXTRAFLAG := $(KCSANFLAG)
 $K/%.o: $K/%.c
 	$(CC) $(CFLAGS) $(EXTRAFLAG) -c -o $@ $<
 
+$K/timeutil.o: $K/timeutil.c $K/defs.h $K/boottime.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $U/initcode: $U/initcode.S
 	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
@@ -292,6 +299,7 @@ clean:
 	$K/kernel \
 	mkfs/mkfs fs.img .gdbinit __pycache__ xv6.out* \
 	ph barrier
+	rm -f $(K)/boottime.h
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
