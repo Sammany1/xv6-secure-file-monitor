@@ -32,7 +32,8 @@ OBJS = \
   $K/plic.o \
   $K/virtio_disk.o \
   $K/filelog.o \
-  $K/suspicious_detect.o
+  $K/suspicious_detect.o \
+  $K/filelog_history.o
 
 
 OBJS_KCSAN = \
