@@ -20,7 +20,7 @@ struct file_access_log {
     char operation[OPERATION_MAX];
     int bytes_transferred;
     int status;  // 1 for success, 0 for failure
-    unsigned int timestamp;
+    char timestamp[25];
     int valid;
 };
 
