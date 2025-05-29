@@ -89,17 +89,17 @@ main(int argc, char *argv[])
     }
     
     printf("Recent File Access Log (%d entries):\n", count);
-    printf("PID    Process    Operation    File             Bytes    Status    Time\n");
-    printf("---    -------    ---------    --------------   -----    ------    ----\n");
+    printf("PID    Process    Operation    File             Bytes    Status    Date\'Time                    \n");
+    printf("---    -------    ---------    --------------   -----    ------    ------------------------\n");
     
     for(int i = 0; i < count; i++) {
         pad_num(logs[i].pid, 3);        printf("    ");
         pad(logs[i].proc_name, 7);     printf("    ");
         pad(logs[i].operation, 9);      printf("    ");
         pad(logs[i].filename, 14);      printf("    ");
-        pad_num(logs[i].bytes_transferred, 5); printf("    ");
+        pad_num(logs[i].bytes_transferred, 5); printf("   ");
         pad(logs[i].status ? "OK" : "FAIL", 6); printf("    ");
-        pad_num(logs[i].timestamp, 4); printf("\n");
+        pad(logs[i].timestamp, 24); printf("\n");
     }
     
     exit(0);

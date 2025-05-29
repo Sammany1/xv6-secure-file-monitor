@@ -3,6 +3,7 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "defs.h"
+#include "timeutil.h"
 
 volatile static int started = 0;
 
@@ -29,6 +30,7 @@ main()
     fileinit();      // file table
     filelog_init();  // Initialize file access logging
     history_log_init(); // Initialize history storage
+    timeutil_init(); 
     virtio_disk_init(); // emulated hard disk
     userinit();      // first user process
     __sync_synchronize();

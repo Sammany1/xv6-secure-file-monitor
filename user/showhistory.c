@@ -216,7 +216,7 @@ main(int argc, char *argv[])
             pad(logs[i].filename, 14);      printf("    ");
             pad_num(logs[i].bytes_transferred, 5); printf("    ");
             pad(logs[i].status ? "OK" : "FAIL", 6); printf("    ");
-            pad_num(logs[i].timestamp, 4); printf("\n");
+            pad(logs[i].timestamp, 24); printf("\n");
             displayed_count++;
         }
     }

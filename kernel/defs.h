@@ -11,6 +11,16 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+// Date/time structure for boot time tracking
+struct rtcdate {
+  uint second;
+  uint minute;
+  uint hour;
+  uint day;
+  uint month;
+  uint year;
+};
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);

@@ -5,6 +5,7 @@
 #include "proc.h"
 #include "defs.h"
 #include "filelog.h"
+#include "timeutil.h"
 
 extern struct spinlock tickslock;
 struct {
@@ -96,7 +97,7 @@ log_file_access(int pid, char *proc_name, char *operation, char *filename, int b
     safestrcpy(entry->filename, filename, sizeof(entry->filename));
     safestrcpy(entry->operation, operation, sizeof(entry->operation));
     entry->bytes_transferred = bytes;
-    entry->timestamp = ticks;
+    format_timestamp(ticks, entry->timestamp, sizeof(entry->timestamp));
     entry->status = status;
     entry->valid = 1;
 
